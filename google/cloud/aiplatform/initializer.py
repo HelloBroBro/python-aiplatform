@@ -36,6 +36,7 @@ from google.cloud.aiplatform import utils
 from google.cloud.aiplatform.metadata import metadata
 from google.cloud.aiplatform.utils import resource_manager_utils
 from google.cloud.aiplatform.tensorboard import tensorboard_resource
+from google.cloud.aiplatform import telemetry
 
 from google.cloud.aiplatform.compat.types import (
     encryption_spec as gca_encryption_spec_compat,
@@ -69,7 +70,9 @@ class _Config:
             # See https://github.com/googleapis/google-auth-library-python/issues/924
             # TODO: Remove when google.auth.default() learns the
             # CLOUD_ML_PROJECT_ID env variable or Vertex AI starts setting GOOGLE_CLOUD_PROJECT env variable.
-            project_number = os.environ.get("CLOUD_ML_PROJECT_ID")
+            project_number = os.environ.get("GOOGLE_CLOUD_PROJECT") or os.environ.get(
+                "CLOUD_ML_PROJECT_ID"
+            )
             if project_number:
                 if not self._credentials:
                     credentials, _ = google.auth.default()
@@ -312,7 +315,7 @@ class _Config:
         if self._location:
             return self._location
 
-        location = os.getenv("CLOUD_ML_REGION")
+        location = os.getenv("GOOGLE_CLOUD_REGION") or os.getenv("CLOUD_ML_REGION")
         if location:
             utils.validate_region(location)
             return location
@@ -475,6 +478,10 @@ class _Config:
                 )
         except Exception:  # pylint: disable=broad-exception-caught
             pass
+
+        if telemetry._tool_names_to_append:
+            # Must append to gapic_version due to b/259738581.
+            gapic_version = f"{gapic_version}+tools+{'+'.join(telemetry._tool_names_to_append[::-1])}"
 
         user_agent = f"{constants.USER_AGENT_PRODUCT}/{gapic_version}"
         if appended_user_agent:
