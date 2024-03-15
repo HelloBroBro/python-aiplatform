@@ -1,6 +1,6 @@
 # Changelog
 
-## [1.44.0](https://github.com/googleapis/python-aiplatform/compare/v1.43.0...v1.44.0) (2024-03-13)
+## [1.44.0](https://github.com/googleapis/python-aiplatform/compare/v1.43.0...v1.44.0) (2024-03-14)
 
 
 ### Features
