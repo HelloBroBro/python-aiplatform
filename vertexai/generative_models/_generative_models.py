@@ -1261,7 +1261,7 @@ class GenerationConfig:
         return cls._from_gapic(raw_generation_config=raw_generation_config)
 
     def to_dict(self) -> Dict[str, Any]:
-        return type(self._raw_generation_config).to_dict(self._raw_generation_config)
+        return _proto_to_dict(self._raw_generation_config)
 
     def __repr__(self) -> str:
         return self._raw_generation_config.__repr__()
@@ -1373,7 +1373,7 @@ class Tool:
         return cls._from_gapic(raw_tool=raw_tool)
 
     def to_dict(self) -> Dict[str, Any]:
-        return type(self._raw_tool).to_dict(self._raw_tool)
+        return _proto_to_dict(self._raw_tool)
 
     def __repr__(self) -> str:
         return self._raw_tool.__repr__()
@@ -1538,9 +1538,7 @@ class FunctionDeclaration:
         return CallableFunctionDeclaration.from_func(func)
 
     def to_dict(self) -> Dict[str, Any]:
-        return type(self._raw_function_declaration).to_dict(
-            self._raw_function_declaration
-        )
+        return _proto_to_dict(self._raw_function_declaration)
 
     def __repr__(self) -> str:
         return self._raw_function_declaration.__repr__()
@@ -1638,7 +1636,7 @@ class GenerationResponse:
         return cls._from_gapic(raw_response=raw_response)
 
     def to_dict(self) -> Dict[str, Any]:
-        return type(self._raw_response).to_dict(self._raw_response)
+        return _proto_to_dict(self._raw_response)
 
     def __repr__(self) -> str:
         return self._raw_response.__repr__()
@@ -1710,7 +1708,7 @@ class Candidate:
         return cls._from_gapic(raw_candidate=raw_candidate)
 
     def to_dict(self) -> Dict[str, Any]:
-        return type(self._raw_candidate).to_dict(self._raw_candidate)
+        return _proto_to_dict(self._raw_candidate)
 
     def __repr__(self) -> str:
         return self._raw_candidate.__repr__()
@@ -1800,7 +1798,7 @@ class Content:
         return cls._from_gapic(raw_content=raw_content)
 
     def to_dict(self) -> Dict[str, Any]:
-        return type(self._raw_content).to_dict(self._raw_content)
+        return _proto_to_dict(self._raw_content)
 
     def __repr__(self) -> str:
         return self._raw_content.__repr__()
@@ -1912,7 +1910,7 @@ class Part:
         )
 
     def to_dict(self) -> Dict[str, Any]:
-        return type(self._raw_part).to_dict(self._raw_part)
+        return _proto_to_dict(self._raw_part)
 
     @property
     def text(self) -> str:
@@ -1926,7 +1924,12 @@ class Part:
 
     @property
     def mime_type(self) -> Optional[str]:
-        return self._raw_part.mime_type
+        part_type = self._raw_part._pb.WhichOneof("data")
+        if part_type == "inline_data":
+            return self._raw_part.inline_data.mime_type
+        if part_type == "file_data":
+            return self._raw_part.file_data.mime_type
+        raise AttributeError(f"Part has no mime_type.\nPart:\n{self.to_dict()}")
 
     @property
     def inline_data(self) -> gapic_content_types.Blob:
@@ -1996,7 +1999,7 @@ class SafetySetting:
         return cls._from_gapic(raw_safety_setting=raw_safety_setting)
 
     def to_dict(self) -> Dict[str, Any]:
-        return type(self._raw_safety_setting).to_dict(self._raw_safety_setting)
+        return _proto_to_dict(self._raw_safety_setting)
 
     def __repr__(self):
         return self._raw_safety_setting.__repr__()
@@ -2221,6 +2224,15 @@ def _append_gapic_part(
         base_part.text += new_part.text
     else:
         base_part._pb = copy.deepcopy(new_part._pb)
+
+
+def _proto_to_dict(message) -> Dict[str, Any]:
+    """Converts a proto-plus protobuf message to a dictionary."""
+    return type(message).to_dict(
+        message,
+        including_default_value_fields=False,
+        use_integers_for_enums=False,
+    )
 
 
 def _dict_to_pretty_string(d: dict) -> str:
