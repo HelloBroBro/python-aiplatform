@@ -563,7 +563,7 @@ _EMBEDDING_MODEL_TUNING_PIPELINE_SPEC = {
                     "parameterType": "STRING",
                 },
                 "base_model_version_id": {
-                    "defaultValue": "textembedding-gecko@001",
+                    "defaultValue": "text-embedding-004",
                     "description": "which base model to tune. This may be any stable\nnumbered version, for example `textembedding-gecko@001`.",
                     "isOptional": True,
                     "parameterType": "STRING",
@@ -578,17 +578,15 @@ _EMBEDDING_MODEL_TUNING_PIPELINE_SPEC = {
                     "description": "the GCS path to the corpus data location.",
                     "parameterType": "STRING",
                 },
-                "iterations": {
-                    "defaultValue": 1000,
-                    "description": "the number of steps to perform fine-tuning.",
-                    "isOptional": True,
-                    "parameterType": "NUMBER_INTEGER",
-                },
-                "location": {
-                    "defaultValue": "us-central1",
-                    "description": "GCP region to run the pipeline.",
+                "encryption_spec_key_name": {
+                    "defaultValue": "",
                     "isOptional": True,
                     "parameterType": "STRING",
+                },
+                "learning_rate_multiplier": {
+                    "defaultValue": 1.0,
+                    "isOptional": True,
+                    "parameterType": "NUMBER_DOUBLE",
                 },
                 "machine_type": {
                     "defaultValue": "n1-standard-16",
@@ -602,9 +600,10 @@ _EMBEDDING_MODEL_TUNING_PIPELINE_SPEC = {
                     "isOptional": True,
                     "parameterType": "STRING",
                 },
-                "project": {
-                    "description": "user's project id.",
-                    "parameterType": "STRING",
+                "output_dimensionality": {
+                    "defaultValue": -1,
+                    "isOptional": True,
+                    "parameterType": "NUMBER_INTEGER",
                 },
                 "queries_path": {
                     "description": "the GCS path to the queries location.",
@@ -625,6 +624,12 @@ _EMBEDDING_MODEL_TUNING_PIPELINE_SPEC = {
                 "train_label_path": {
                     "description": "the GCS path to the train label data location.",
                     "parameterType": "STRING",
+                },
+                "train_steps": {
+                    "defaultValue": 1000,
+                    "description": "the number of steps to perform fine-tuning.",
+                    "isOptional": True,
+                    "parameterType": "NUMBER_INTEGER",
                 },
                 "validation_label_path": {
                     "defaultValue": "",
@@ -1656,7 +1661,7 @@ def get_endpoint_mock():
 @pytest.fixture
 def mock_deploy_tuned_embedding_model(get_endpoint_mock):
     with mock.patch.object(
-        _language_models._TunableTextEmbeddingModelMixin, "deploy_tuned_model"
+        _language_models._PreviewTunableTextEmbeddingModelMixin, "deploy_tuned_model"
     ) as mock_text_generation_model:
         mock_text_generation_model.return_value._model_id = (
             test_constants.ModelConstants._TEST_MODEL_RESOURCE_NAME
@@ -2283,6 +2288,67 @@ class TestLanguageModels:
         ["https://us-central1-kfp.pkg.dev/proj/repo/pack/latest"],
         indirect=True,
     )
+    @pytest.mark.parametrize(
+        "base_model_version_id,use_preview_module,tune_args,expected_pipeline_args",
+        [  # Do not pass any optional parameters.
+            (
+                "textembedding-gecko@003",
+                False,
+                dict(
+                    training_data="gs://bucket/training.tsv",
+                    corpus_data="gs://bucket/corpus.jsonl",
+                    queries_data="gs://bucket/queries.jsonl",
+                ),
+                dict(
+                    base_model_version_id="textembedding-gecko@003",
+                    train_label_path="gs://bucket/training.tsv",
+                    corpus_path="gs://bucket/corpus.jsonl",
+                    queries_path="gs://bucket/queries.jsonl",
+                    encryption_spec_key_name=_TEST_ENCRYPTION_KEY_NAME,
+                ),
+            ),
+            # Pass all optional parameters.
+            (
+                "text-multilingual-embedding-002",
+                True,
+                dict(
+                    training_data="gs://bucket/training.tsv",
+                    corpus_data="gs://bucket/corpus.jsonl",
+                    queries_data="gs://bucket/queries.jsonl",
+                    test_data="gs://bucket/test.tsv",
+                    validation_data="gs://bucket/validation.tsv",
+                    tuned_model_location="us-central1",
+                    model_display_name="my-tuned-model",
+                    train_steps=30,
+                    batch_size=256,
+                    accelerator="NVIDIA_TESLA_V100",
+                    accelerator_count=1,
+                    machine_type="n1-highmem-16",
+                    task_type="DEFAULT",
+                    output_dimensionality=128,
+                    learning_rate_multiplier=0.1,
+                ),
+                dict(
+                    train_steps=30,
+                    accelerator_type="NVIDIA_TESLA_V100",
+                    accelerator_count=1,
+                    machine_type="n1-highmem-16",
+                    base_model_version_id="text-multilingual-embedding-002",
+                    train_label_path="gs://bucket/training.tsv",
+                    corpus_path="gs://bucket/corpus.jsonl",
+                    queries_path="gs://bucket/queries.jsonl",
+                    test_label_path="gs://bucket/test.tsv",
+                    batch_size=256,
+                    model_display_name="my-tuned-model",
+                    validation_label_path="gs://bucket/validation.tsv",
+                    encryption_spec_key_name=_TEST_ENCRYPTION_KEY_NAME,
+                    task_type="DEFAULT",
+                    output_dimensionality=128,
+                    learning_rate_multiplier=0.1,
+                ),
+            ),
+        ],
+    )
     def test_tune_text_embedding_model(
         self,
         mock_pipeline_service_create,
@@ -2294,6 +2360,10 @@ class TestLanguageModels:
         mock_gcs_upload,
         mock_request_urlopen_gecko,
         mock_deploy_tuned_embedding_model,
+        tune_args,
+        expected_pipeline_args,
+        base_model_version_id,
+        use_preview_module,
     ):
         """Tests tuning the text embedding model."""
         aiplatform.init(
@@ -2308,24 +2378,27 @@ class TestLanguageModels:
                 _TEXT_GECKO_PUBLISHER_MODEL_DICT
             ),
         ):
-            model = language_models.TextEmbeddingModel.from_pretrained(
-                "textembedding-gecko@003"
+            language_models_module = (
+                preview_language_models if use_preview_module else language_models
             )
-            tuning_job = model.tune_model(
-                training_data="gs://bucket/training.tsv",
-                corpus_data="gs://bucket/corpus.jsonl",
-                queries_data="gs://bucket/queries.jsonl",
-                test_data="gs://bucket/test.tsv",
-                tuned_model_location="us-central1",
-                train_steps=10,
-                accelerator="NVIDIA_TESLA_A100",
+            model = language_models_module.TextEmbeddingModel.from_pretrained(
+                base_model_version_id
             )
+            tuning_job = model.tune_model(**tune_args)
             call_kwargs = mock_pipeline_service_create.call_args[1]
-            pipeline_arguments = call_kwargs[
-                "pipeline_job"
-            ].runtime_config.parameter_values
-            assert pipeline_arguments["iterations"] == 10
-            assert pipeline_arguments["accelerator_type"] == "NVIDIA_TESLA_A100"
+            pipeline_arguments = dict(
+                call_kwargs["pipeline_job"].runtime_config.parameter_values
+            )
+
+            if (
+                "model_display_name" not in tune_args
+                and "model_display_name" in pipeline_arguments
+            ):
+                # This is automatically generated from some params, so don't
+                # check it.
+                del pipeline_arguments["model_display_name"]
+
+            assert pipeline_arguments == expected_pipeline_args
 
             # Testing the tuned model
             tuned_model = tuning_job.deploy_tuned_model()
