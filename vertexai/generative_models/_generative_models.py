@@ -1181,7 +1181,6 @@ class ResponseValidationError(ResponseBlockedError):
 
 class GenerationConfig:
     """Parameters for the generation."""
-    ResponseStyle = gapic_content_types.GenerationConfig.ResponseStyle
 
     def __init__(
         self,
@@ -1195,7 +1194,6 @@ class GenerationConfig:
         presence_penalty: Optional[float] = None,
         frequency_penalty: Optional[float] = None,
         response_mime_type: Optional[str] = None,
-        response_style: Optional["GenerationConfig.ResponseStyle"] = None,
     ):
         r"""Constructs a GenerationConfig object.
 
@@ -1218,7 +1216,6 @@ class GenerationConfig:
 
                 The model needs to be prompted to output the appropriate
                 response type, otherwise the behavior is undefined.
-            response_style: Control three levels of creativity in the model output.
 
         Usage:
             ```
@@ -1231,7 +1228,6 @@ class GenerationConfig:
                     candidate_count=1,
                     max_output_tokens=100,
                     stop_sequences=["\n\n\n"],
-                    response_style=ResponseStyle.RESPONSE_STYLE_PRECISE,
                 )
             )
             ```
@@ -1246,7 +1242,6 @@ class GenerationConfig:
             presence_penalty=presence_penalty,
             frequency_penalty=frequency_penalty,
             response_mime_type=response_mime_type,
-            response_style=response_style,
         )
 
     @classmethod
@@ -2017,6 +2012,28 @@ class SafetySetting:
 class grounding:  # pylint: disable=invalid-name
     """Grounding namespace."""
 
+    __module__ = "vertexai.generative_models"
+
+    def __init__(self):
+        raise RuntimeError("This class must not be instantiated.")
+
+    class GoogleSearchRetrieval:
+        r"""Tool to retrieve public web data for grounding, powered by
+        Google Search.
+        """
+
+        def __init__(self):
+            """Initializes a Google Search Retrieval tool.
+            """
+            self._raw_google_search_retrieval = gapic_tool_types.GoogleSearchRetrieval()
+
+
+class preview_grounding:  # pylint: disable=invalid-name
+    """Grounding namespace (preview)."""
+
+    __name__ = "grounding"
+    __module__ = "vertexai.preview.generative_models"
+
     def __init__(self):
         raise RuntimeError("This class must not be instantiated.")
 
@@ -2383,7 +2400,13 @@ class AutomaticFunctionCallingResponder:
                     )
                 callable_function = None
                 for tool in tools:
-                    callable_function = tool._callable_functions.get(function_call.name)
+                    new_callable_function = tool._callable_functions.get(function_call.name)
+                    if new_callable_function and callable_function:
+                        raise ValueError(
+                            "Multiple functions with the same name are not supported."
+                            f" Found {callable_function} and {new_callable_function}."
+                        )
+                    callable_function = new_callable_function
                 if not callable_function:
                     raise RuntimeError(
                         f"""Model has asked to call function "{function_call.name}" which was not found."""
