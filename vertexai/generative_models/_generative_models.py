@@ -50,7 +50,7 @@ import warnings
 
 if TYPE_CHECKING:
     from vertexai.preview import rag
-    from vertexai.preview import caching
+    from vertexai._caching import _caching as caching
 
 try:
     from PIL import Image as PIL_Image  # pylint: disable=g-import-not-at-top
@@ -110,7 +110,7 @@ def _reconcile_model_name(model_name: str, project: str, location: str) -> str:
     if "/" not in model_name:
         return f"publishers/google/models/{model_name}"
     elif model_name.startswith("models/"):
-        return f"projects/{project}/locations/{location}/publishers/google/{model_name}"
+        return f"publishers/google/{model_name}"
     elif model_name.startswith("publishers/") or model_name.startswith("projects/"):
         return model_name
     else:
@@ -2602,7 +2602,7 @@ class _PreviewGenerativeModel(_GenerativeModel):
         )
 
     @classmethod
-    def from_cached_content(
+    def _from_cached_content(
         cls,
         cached_content: "caching.CachedContent",
         *,

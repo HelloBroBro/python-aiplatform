@@ -40,7 +40,7 @@ from google.cloud.aiplatform_v1beta1.services import (
     gen_ai_cache_service,
 )
 from vertexai.generative_models import _function_calling_utils
-from vertexai.preview import caching
+from vertexai._caching import _caching as caching
 
 
 _TEST_PROJECT = "test-project"
@@ -422,6 +422,7 @@ class TestGenerativeModels:
             model1._prediction_resource_name
             == project_location_prefix + "publishers/google/models/" + model_name1
         )
+        assert model1._model_name == "publishers/google/models/gemini-pro"
 
         model_name2 = "models/gemini-pro"
         model2 = generative_models.GenerativeModel(model_name2)
@@ -429,10 +430,12 @@ class TestGenerativeModels:
             model2._prediction_resource_name
             == project_location_prefix + "publishers/google/" + model_name2
         )
+        assert model2._model_name == "publishers/google/models/gemini-pro"
 
         model_name3 = "publishers/some_publisher/models/some_model"
         model3 = generative_models.GenerativeModel(model_name3)
         assert model3._prediction_resource_name == project_location_prefix + model_name3
+        assert model3._model_name == "publishers/some_publisher/models/some_model"
 
         model_name4 = (
             f"projects/{_TEST_PROJECT2}/locations/{_TEST_LOCATION2}/endpoints/endpoint1"
@@ -440,6 +443,7 @@ class TestGenerativeModels:
         model4 = generative_models.GenerativeModel(model_name4)
         assert model4._prediction_resource_name == model_name4
         assert _TEST_LOCATION2 in model4._prediction_client._api_endpoint
+        assert model4._model_name == model_name4
 
         with pytest.raises(ValueError):
             generative_models.GenerativeModel("foo/bar/models/gemini-pro")
@@ -454,7 +458,7 @@ class TestGenerativeModels:
             "cached-content-id-in-from-cached-content-test"
         )
 
-        model = preview_generative_models.GenerativeModel.from_cached_content(
+        model = preview_generative_models.GenerativeModel._from_cached_content(
             cached_content=cached_content
         )
 
@@ -582,7 +586,7 @@ class TestGenerativeModels:
             "cached-content-id-in-from-cached-content-test"
         )
 
-        model = preview_generative_models.GenerativeModel.from_cached_content(
+        model = preview_generative_models.GenerativeModel._from_cached_content(
             cached_content=cached_content
         )
 
