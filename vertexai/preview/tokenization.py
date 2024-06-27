@@ -1,6 +1,4 @@
-# -*- coding: utf-8 -*-
-
-# Copyright 2021 Google LLC
+# Copyright 2024 Google LLC
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -15,4 +13,11 @@
 # limitations under the License.
 #
 
-__version__ = "1.57.0"
+# We just want to re-export certain classes
+# pylint: disable=g-multiple-import,g-importing-member
+from vertexai.tokenization._tokenizers import (
+    get_tokenizer_for_model,
+)
+
+
+__all__ = ["get_tokenizer_for_model"]
