@@ -825,7 +825,7 @@ class _GenerativeModel:
     def compute_tokens(
         self, contents: ContentsType
     ) -> gapic_llm_utility_service_types.ComputeTokensResponse:
-        """Counts tokens.
+        """Computes tokens.
 
         Args:
             contents: Contents to send to the model.
@@ -837,9 +837,13 @@ class _GenerativeModel:
                 * List[Content]
 
         Returns:
-            A CountTokensResponse object that has the following attributes:
-                total_tokens: The total number of tokens counted across all instances from the request.
-                total_billable_characters: The total number of billable characters counted across all instances from the request.
+            A ComputeTokensResponse object that has the following attributes:
+                tokens_info: Lists of tokens_info from the input.
+                             The input `contents: ContentsType` could have
+                             multiple string instances and each tokens_info
+                             item represents each string instance. Each token
+                             info consists tokens list, token_ids list and
+                             a role.
         """
         return self._llm_utility_client.compute_tokens(
             request=gapic_llm_utility_service_types.ComputeTokensRequest(
@@ -852,7 +856,7 @@ class _GenerativeModel:
     async def compute_tokens_async(
         self, contents: ContentsType
     ) -> gapic_llm_utility_service_types.ComputeTokensResponse:
-        """Counts tokens asynchronously.
+        """Computes tokens asynchronously.
 
         Args:
             contents: Contents to send to the model.
@@ -864,9 +868,13 @@ class _GenerativeModel:
                 * List[Content]
 
         Returns:
-            And awaitable for a CountTokensResponse object that has the following attributes:
-                total_tokens: The total number of tokens counted across all instances from the request.
-                total_billable_characters: The total number of billable characters counted across all instances from the request.
+            And awaitable for a ComputeTokensResponse object that has the following attributes:
+                tokens_info: Lists of tokens_info from the input.
+                             The input `contents: ContentsType` could have
+                             multiple string instances and each tokens_info
+                             item represents each string instance. Each token
+                             info consists tokens list, token_ids list and
+                             a role.
         """
         return await self._llm_utility_async_client.compute_tokens(
             request=gapic_llm_utility_service_types.ComputeTokensRequest(
@@ -2302,20 +2310,22 @@ class preview_grounding:  # pylint: disable=invalid-name
 
         def __init__(
             self,
-            disable_attribution: Optional[bool] = None,
+            disable_attribution: Optional[
+                bool
+            ] = None,  # pylint: disable=unused-argument
         ):
             """Initializes a Google Search Retrieval tool.
 
             Args:
                 disable_attribution (bool):
-                    Optional. Disable using the result from this
-                    tool in detecting grounding attribution. This
+                    Optional. This field is Deprecated. Disable using the result
+                    from this tool in detecting grounding attribution. This
                     does not affect how the result is given to the
                     model for generation.
             """
-            self._raw_google_search_retrieval = gapic_tool_types.GoogleSearchRetrieval(
-                disable_attribution=disable_attribution,
-            )
+            if disable_attribution is not None:
+                warnings.warn("disable_attribution is deprecated.")
+            self._raw_google_search_retrieval = gapic_tool_types.GoogleSearchRetrieval()
 
 
 def _to_content(
