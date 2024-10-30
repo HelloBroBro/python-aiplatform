@@ -1,5 +1,3 @@
-# -*- coding: utf-8 -*-
-
 # Copyright 2024 Google LLC
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -14,5 +12,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
+"""Classes for batch prediction."""
 
-__version__ = "1.71.0"
+# We just want to re-export certain classes
+# pylint: disable=g-multiple-import,g-importing-member
+from vertexai.batch_prediction._batch_prediction import (
+    BatchPredictionJob,
+)
+
+__all__ = [
+    "BatchPredictionJob",
+]
