@@ -15,7 +15,6 @@
 """Classes for working with generative models."""
 # pylint: disable=bad-continuation, line-too-long, protected-access
 
-from collections.abc import Mapping
 import copy
 import io
 import json
@@ -30,6 +29,7 @@ from typing import (
     Iterable,
     List,
     Literal,
+    Mapping,
     Optional,
     Sequence,
     Type,
@@ -484,6 +484,7 @@ class _GenerativeModel:
         self,
         contents: ContentsType,
         *,
+        model: Optional[str] = None,
         generation_config: Optional[GenerationConfigType] = None,
         safety_settings: Optional[SafetySettingsType] = None,
         tools: Optional[List["Tool"]] = None,
@@ -495,6 +496,7 @@ class _GenerativeModel:
         if not contents:
             raise TypeError("contents must not be empty")
 
+        model = model or self._prediction_resource_name
         generation_config = generation_config or self._generation_config
         safety_settings = safety_settings or self._safety_settings
         tools = tools or self._tools
@@ -563,7 +565,7 @@ class _GenerativeModel:
             # The `model` parameter now needs to be set for the vision models.
             # Always need to pass the resource via the `model` parameter.
             # Even when resource is an endpoint.
-            model=self._prediction_resource_name,
+            model=model,
             contents=contents,
             generation_config=gapic_generation_config,
             safety_settings=gapic_safety_settings,
@@ -2072,10 +2074,25 @@ class ToolConfig:
                 )
             )
 
+        def __repr__(self) -> str:
+            return self._gapic_function_calling_config.__repr__()
+
     def __init__(self, function_calling_config: "ToolConfig.FunctionCallingConfig"):
         self._gapic_tool_config = gapic_tool_types.ToolConfig(
             function_calling_config=function_calling_config._gapic_function_calling_config
         )
+
+    @classmethod
+    def _from_gapic(
+        cls,
+        gapic_tool_config: gapic_tool_types.ToolConfig,
+    ) -> "ToolConfig":
+        response = cls.__new__(cls)
+        response._gapic_tool_config = gapic_tool_config
+        return response
+
+    def __repr__(self) -> str:
+        return self._gapic_tool_config.__repr__()
 
 
 class FunctionDeclaration:
@@ -2953,11 +2970,19 @@ def _append_gapic_part(
 
 def _proto_to_dict(message) -> Dict[str, Any]:
     """Converts a proto-plus protobuf message to a dictionary."""
-    return type(message).to_dict(
+    # The best way to convert proto to dict is not trivial.
+    # Ideally, we want original keys in snake_case.
+    # The preserving_proto_field_name flag controls key names, but states have issues:
+    # `False` leads to keys using camelCase instead of snake_case.
+    # `True` leads to keys using snake_case, but has renamed names like `type_`.
+    # We needs to fix this issue using _fix_renamed_proto_dict_keys_in_place.
+    result = type(message).to_dict(
         message,
         including_default_value_fields=False,
         use_integers_for_enums=False,
     )
+    _fix_renamed_proto_dict_keys_in_place(result)
+    return result
 
 
 def _dict_to_proto(message_type: Type[T], message_dict: Dict[str, Any]) -> T:
@@ -2972,6 +2997,21 @@ def _dict_to_proto(message_type: Type[T], message_dict: Dict[str, Any]) -> T:
 def _dict_to_pretty_string(d: dict) -> str:
     """Format dict as a pretty-printed JSON string."""
     return json.dumps(d, indent=2)
+
+
+def _fix_renamed_proto_dict_keys_in_place(d: Mapping[str, Any]):
+    """Fixes proto dict keys in place."""
+    for key, value in list(d.items()):
+        if key.endswith("_"):
+            new_key = key.rstrip("_")
+            del d[key]
+            d[new_key] = value
+        if isinstance(value, Mapping):
+            _fix_renamed_proto_dict_keys_in_place(value)
+        if isinstance(value, Sequence) and not isinstance(value, str):
+            for item in value:
+                if isinstance(item, Mapping):
+                    _fix_renamed_proto_dict_keys_in_place(item)
 
 
 _FORMAT_TO_MIME_TYPE = {
@@ -3226,6 +3266,7 @@ class GenerativeModel(_GenerativeModel):
         self,
         contents: ContentsType,
         *,
+        model: Optional[str] = None,
         generation_config: Optional[GenerationConfigType] = None,
         safety_settings: Optional[SafetySettingsType] = None,
         tools: Optional[List["Tool"]] = None,
@@ -3236,6 +3277,7 @@ class GenerativeModel(_GenerativeModel):
         """Prepares a GAPIC GenerateContentRequest."""
         request_v1beta1 = super()._prepare_request(
             contents=contents,
+            model=model,
             generation_config=generation_config,
             safety_settings=safety_settings,
             tools=tools,
