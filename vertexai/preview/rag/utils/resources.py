@@ -137,6 +137,21 @@ class Pinecone:
 
 
 @dataclasses.dataclass
+class VertexAiSearchConfig:
+    """VertexAiSearchConfig.
+
+    Attributes:
+        serving_config: The resource name of the Vertex AI Search serving config.
+            Format:
+                ``projects/{project}/locations/{location}/collections/{collection}/engines/{engine}/servingConfigs/{serving_config}``
+            or
+                ``projects/{project}/locations/{location}/collections/{collection}/dataStores/{data_store}/servingConfigs/{serving_config}``
+    """
+
+    serving_config: Optional[str] = None
+
+
+@dataclasses.dataclass
 class RagCorpus:
     """RAG corpus(output only).
 
@@ -147,6 +162,7 @@ class RagCorpus:
         description: The description of the RagCorpus.
         embedding_model_config: The embedding model config of the RagCorpus.
         vector_db: The Vector DB of the RagCorpus.
+        vertex_ai_search_config: The Vertex AI Search config of the RagCorpus.
     """
 
     name: Optional[str] = None
@@ -156,6 +172,7 @@ class RagCorpus:
     vector_db: Optional[
         Union[Weaviate, VertexFeatureStore, VertexVectorSearch, Pinecone, RagManagedDb]
     ] = None
+    vertex_ai_search_config: Optional[VertexAiSearchConfig] = None
 
 
 @dataclasses.dataclass
@@ -323,7 +340,8 @@ class LlmRanker:
     """LlmRanker.
 
     Attributes:
-        model_name: The model name used for ranking.
+        model_name: The model name used for ranking. Only Gemini models are
+            supported for now.
     """
 
     model_name: Optional[str] = None
@@ -373,3 +391,27 @@ class RagRetrievalConfig:
     filter: Optional[Filter] = None
     hybrid_search: Optional[HybridSearch] = None
     ranking: Optional[Ranking] = None
+
+
+@dataclasses.dataclass
+class ChunkingConfig:
+    """ChunkingConfig.
+
+    Attributes:
+        chunk_size: The size of each chunk.
+        chunk_overlap: The size of the overlap between chunks.
+    """
+
+    chunk_size: int
+    chunk_overlap: int
+
+
+@dataclasses.dataclass
+class TransformationConfig:
+    """TransformationConfig.
+
+    Attributes:
+        chunking_config: The chunking config.
+    """
+
+    chunking_config: Optional[ChunkingConfig] = None

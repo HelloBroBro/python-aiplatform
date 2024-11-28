@@ -43,6 +43,7 @@ def retrieval_query(
 
     vertexai.init(project="my-project")
 
+    # Using deprecated parameters
     results = vertexai.preview.rag.retrieval_query(
         text="Why is the sky blue?",
         rag_resources=[vertexai.preview.rag.RagResource(
@@ -53,6 +54,31 @@ def retrieval_query(
         vector_distance_threshold=0.5,
         vector_search_alpha=0.5,
     )
+
+    # Using RagRetrievalConfig. Equivalent to the above example.
+    config = vertexai.preview.rag.RagRetrievalConfig(
+        top_k=2,
+        filter=vertexai.preview.rag.Filter(
+            vector_distance_threshold=0.5
+        ),
+        hybrid_search=vertexai.preview.rag.rag_retrieval_config.hybrid_search(
+            alpha=0.5
+        ),
+        ranking=vertex.preview.rag.Ranking(
+            llm_ranker=vertexai.preview.rag.LlmRanker(
+                model_name="gemini-1.5-flash-002"
+            )
+        )
+    )
+
+    results = vertexai.preview.rag.retrieval_query(
+        text="Why is the sky blue?",
+        rag_resources=[vertexai.preview.rag.RagResource(
+            rag_corpus="projects/my-project/locations/us-central1/ragCorpora/rag-corpus-1",
+            rag_file_ids=["rag-file-1", "rag-file-2", ...],
+        )],
+        rag_retrieval_config=config,
+    )
     ```
 
     Args:
@@ -61,17 +87,20 @@ def retrieval_query(
             only or ragfiles. Currently only support one corpus or multiple files
             from one corpus. In the future we may open up multiple corpora support.
         rag_corpora: If rag_resources is not specified, use rag_corpora as a list
-            of rag corpora names.
-        similarity_top_k: The number of contexts to retrieve.
+            of rag corpora names. Deprecated. Use rag_resources instead.
+        similarity_top_k: The number of contexts to retrieve. Deprecated. Use
+            rag_retrieval_config.top_k instead.
         vector_distance_threshold: Optional. Only return contexts with vector
-            distance smaller than the threshold.
+            distance smaller than the threshold. Deprecated. Use
+            rag_retrieval_config.filter.vector_distance_threshold instead.
         vector_search_alpha: Optional. Controls the weight between dense and
             sparse vector search results. The range is [0, 1], where 0 means
             sparse vector search only and 1 means dense vector search only.
-            The default value is 0.5.
+            The default value is 0.5. Deprecated. Use
+            rag_retrieval_config.hybrid_search.alpha instead.
         rag_retrieval_config: Optional. The config containing the retrieval
-            parameters, including similarity_top_k, vector_distance_threshold,
-            vector_search_alpha, and hybrid_search.
+            parameters, including top_k, vector_distance_threshold,
+            and alpha.
 
     Returns:
         RetrieveContextsResonse.
@@ -166,11 +195,12 @@ def retrieval_query(
     else:
         # If rag_retrieval_config is specified, check for missing parameters.
         api_retrival_config = aiplatform_v1beta1.RagRetrievalConfig()
-        api_retrival_config.top_k = (
-            rag_retrieval_config.top_k
-            if rag_retrieval_config.top_k
-            else similarity_top_k
-        )
+        # Set top_k to config value if specified
+        if rag_retrieval_config.top_k:
+            api_retrival_config.top_k = rag_retrieval_config.top_k
+        else:
+            api_retrival_config.top_k = similarity_top_k
+        # Set alpha to config value if specified
         if (
             rag_retrieval_config.hybrid_search
             and rag_retrieval_config.hybrid_search.alpha
@@ -180,6 +210,19 @@ def retrieval_query(
             )
         else:
             api_retrival_config.hybrid_search.alpha = vector_search_alpha
+        # Check if both vector_distance_threshold and vector_similarity_threshold
+        # are specified.
+        if (
+            rag_retrieval_config.filter
+            and rag_retrieval_config.filter.vector_distance_threshold
+            and rag_retrieval_config.filter.vector_similarity_threshold
+        ):
+            raise ValueError(
+                "Only one of vector_distance_threshold or"
+                " vector_similarity_threshold can be specified at a time"
+                " in rag_retrieval_config."
+            )
+        # Set vector_distance_threshold to config value if specified
         if (
             rag_retrieval_config.filter
             and rag_retrieval_config.filter.vector_distance_threshold
@@ -190,6 +233,29 @@ def retrieval_query(
         else:
             api_retrival_config.filter.vector_distance_threshold = (
                 vector_distance_threshold
+            )
+        # Set vector_similarity_threshold to config value if specified
+        if (
+            rag_retrieval_config.filter
+            and rag_retrieval_config.filter.vector_similarity_threshold
+        ):
+            api_retrival_config.filter.vector_similarity_threshold = (
+                rag_retrieval_config.filter.vector_similarity_threshold
+            )
+
+        if (
+            rag_retrieval_config.ranking
+            and rag_retrieval_config.ranking.rank_service
+            and rag_retrieval_config.ranking.llm_ranker
+        ):
+            raise ValueError("Only one of rank_service and llm_ranker can be set.")
+        if rag_retrieval_config.ranking and rag_retrieval_config.ranking.rank_service:
+            api_retrival_config.ranking.rank_service.model_name = (
+                rag_retrieval_config.ranking.rank_service.model_name
+            )
+        elif rag_retrieval_config.ranking and rag_retrieval_config.ranking.llm_ranker:
+            api_retrival_config.ranking.llm_ranker.model_name = (
+                rag_retrieval_config.ranking.llm_ranker.model_name
             )
     query = aiplatform_v1beta1.RagQuery(
         text=text,

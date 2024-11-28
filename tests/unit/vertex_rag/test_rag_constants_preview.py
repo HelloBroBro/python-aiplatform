@@ -22,11 +22,14 @@ from vertexai.preview.rag import (
     EmbeddingModelConfig,
     Filter,
     HybridSearch,
+    LlmRanker,
     Pinecone,
     RagCorpus,
     RagFile,
     RagResource,
     RagRetrievalConfig,
+    Ranking,
+    RankService,
     SharePointSource,
     SharePointSources,
     SlackChannelsSource,
@@ -34,12 +37,14 @@ from vertexai.preview.rag import (
     JiraSource,
     JiraQuery,
     Weaviate,
+    VertexAiSearchConfig,
     VertexVectorSearch,
     VertexFeatureStore,
 )
 from google.cloud.aiplatform_v1beta1 import (
     GoogleDriveSource,
     RagFileChunkingConfig,
+    RagFileTransformationConfig,
     RagFileParsingConfig,
     ImportRagFilesConfig,
     ImportRagFilesRequest,
@@ -52,6 +57,7 @@ from google.cloud.aiplatform_v1beta1 import (
     RagContexts,
     RetrieveContextsResponse,
     RagVectorDbConfig,
+    VertexAiSearchConfig as GapicVertexAiSearchConfig,
 )
 from google.cloud.aiplatform_v1beta1.types import api_auth
 from google.protobuf import timestamp_pb2
@@ -189,6 +195,44 @@ TEST_RAG_CORPUS_VERTEX_VECTOR_SEARCH = RagCorpus(
     vector_db=TEST_VERTEX_VECTOR_SEARCH_CONFIG,
 )
 TEST_PAGE_TOKEN = "test-page-token"
+# Vertex AI Search Config
+TEST_VERTEX_AI_SEARCH_ENGINE_SERVING_CONFIG = f"projects/{TEST_PROJECT_NUMBER}/locations/{TEST_REGION}/collections/test-collection/engines/test-engine/servingConfigs/test-serving-config"
+TEST_VERTEX_AI_SEARCH_DATASTORE_SERVING_CONFIG = f"projects/{TEST_PROJECT_NUMBER}/locations/{TEST_REGION}/collections/test-collection/dataStores/test-datastore/servingConfigs/test-serving-config"
+TEST_GAPIC_RAG_CORPUS_VERTEX_AI_ENGINE_SEARCH_CONFIG = GapicRagCorpus(
+    name=TEST_RAG_CORPUS_RESOURCE_NAME,
+    display_name=TEST_CORPUS_DISPLAY_NAME,
+    vertex_ai_search_config=GapicVertexAiSearchConfig(
+        serving_config=TEST_VERTEX_AI_SEARCH_ENGINE_SERVING_CONFIG,
+    ),
+)
+TEST_GAPIC_RAG_CORPUS_VERTEX_AI_DATASTORE_SEARCH_CONFIG = GapicRagCorpus(
+    name=TEST_RAG_CORPUS_RESOURCE_NAME,
+    display_name=TEST_CORPUS_DISPLAY_NAME,
+    vertex_ai_search_config=GapicVertexAiSearchConfig(
+        serving_config=TEST_VERTEX_AI_SEARCH_DATASTORE_SERVING_CONFIG,
+    ),
+)
+TEST_VERTEX_AI_SEARCH_CONFIG_ENGINE = VertexAiSearchConfig(
+    serving_config=TEST_VERTEX_AI_SEARCH_ENGINE_SERVING_CONFIG,
+)
+TEST_VERTEX_AI_SEARCH_CONFIG_DATASTORE = VertexAiSearchConfig(
+    serving_config=TEST_VERTEX_AI_SEARCH_DATASTORE_SERVING_CONFIG,
+)
+TEST_VERTEX_AI_SEARCH_CONFIG_INVALID = VertexAiSearchConfig(
+    serving_config="invalid-serving-config",
+)
+TEST_VERTEX_AI_SEARCH_CONFIG_EMPTY = VertexAiSearchConfig()
+
+TEST_RAG_CORPUS_VERTEX_AI_ENGINE_SEARCH_CONFIG = RagCorpus(
+    name=TEST_RAG_CORPUS_RESOURCE_NAME,
+    display_name=TEST_CORPUS_DISPLAY_NAME,
+    vertex_ai_search_config=TEST_VERTEX_AI_SEARCH_CONFIG_ENGINE,
+)
+TEST_RAG_CORPUS_VERTEX_AI_DATASTORE_SEARCH_CONFIG = RagCorpus(
+    name=TEST_RAG_CORPUS_RESOURCE_NAME,
+    display_name=TEST_CORPUS_DISPLAY_NAME,
+    vertex_ai_search_config=TEST_VERTEX_AI_SEARCH_CONFIG_DATASTORE,
+)
 
 # RagFiles
 TEST_PATH = "usr/home/my_file.txt"
@@ -213,10 +257,22 @@ TEST_RAG_FILE_JSON = {
 TEST_RAG_FILE_JSON_ERROR = {"error": {"code": 13}}
 TEST_CHUNK_SIZE = 512
 TEST_CHUNK_OVERLAP = 100
+TEST_RAG_FILE_TRANSFORMATION_CONFIG = RagFileTransformationConfig(
+    rag_file_chunking_config=RagFileChunkingConfig(
+        fixed_length_chunking=RagFileChunkingConfig.FixedLengthChunking(
+            chunk_size=TEST_CHUNK_SIZE,
+            chunk_overlap=TEST_CHUNK_OVERLAP,
+        ),
+    ),
+)
 # GCS
-TEST_IMPORT_FILES_CONFIG_GCS = ImportRagFilesConfig()
+TEST_IMPORT_FILES_CONFIG_GCS = ImportRagFilesConfig(
+    rag_file_transformation_config=TEST_RAG_FILE_TRANSFORMATION_CONFIG,
+)
 TEST_IMPORT_FILES_CONFIG_GCS.gcs_source.uris = [TEST_GCS_PATH]
-TEST_IMPORT_FILES_CONFIG_GCS.rag_file_parsing_config.use_advanced_pdf_parsing = False
+TEST_IMPORT_FILES_CONFIG_GCS.rag_file_parsing_config.advanced_parser.use_advanced_pdf_parsing = (
+    False
+)
 TEST_IMPORT_REQUEST_GCS = ImportRagFilesRequest(
     parent=TEST_RAG_CORPUS_RESOURCE_NAME,
     import_rag_files_config=TEST_IMPORT_FILES_CONFIG_GCS,
@@ -229,24 +285,28 @@ TEST_DRIVE_FOLDER = (
 TEST_DRIVE_FOLDER_2 = (
     f"https://drive.google.com/drive/folders/{TEST_DRIVE_FOLDER_ID}?resourcekey=0-eiOT3"
 )
-TEST_IMPORT_FILES_CONFIG_DRIVE_FOLDER = ImportRagFilesConfig()
+TEST_IMPORT_FILES_CONFIG_DRIVE_FOLDER = ImportRagFilesConfig(
+    rag_file_transformation_config=TEST_RAG_FILE_TRANSFORMATION_CONFIG,
+)
 TEST_IMPORT_FILES_CONFIG_DRIVE_FOLDER.google_drive_source.resource_ids = [
     GoogleDriveSource.ResourceId(
         resource_id=TEST_DRIVE_FOLDER_ID,
         resource_type=GoogleDriveSource.ResourceId.ResourceType.RESOURCE_TYPE_FOLDER,
     )
 ]
-TEST_IMPORT_FILES_CONFIG_DRIVE_FOLDER.rag_file_parsing_config.use_advanced_pdf_parsing = (
+TEST_IMPORT_FILES_CONFIG_DRIVE_FOLDER.rag_file_parsing_config.advanced_parser.use_advanced_pdf_parsing = (
     False
 )
-TEST_IMPORT_FILES_CONFIG_DRIVE_FOLDER_PARSING = ImportRagFilesConfig()
+TEST_IMPORT_FILES_CONFIG_DRIVE_FOLDER_PARSING = ImportRagFilesConfig(
+    rag_file_transformation_config=TEST_RAG_FILE_TRANSFORMATION_CONFIG,
+)
 TEST_IMPORT_FILES_CONFIG_DRIVE_FOLDER_PARSING.google_drive_source.resource_ids = [
     GoogleDriveSource.ResourceId(
         resource_id=TEST_DRIVE_FOLDER_ID,
         resource_type=GoogleDriveSource.ResourceId.ResourceType.RESOURCE_TYPE_FOLDER,
     )
 ]
-TEST_IMPORT_FILES_CONFIG_DRIVE_FOLDER_PARSING.rag_file_parsing_config.use_advanced_pdf_parsing = (
+TEST_IMPORT_FILES_CONFIG_DRIVE_FOLDER_PARSING.rag_file_parsing_config.advanced_parser.use_advanced_pdf_parsing = (
     True
 )
 TEST_IMPORT_REQUEST_DRIVE_FOLDER = ImportRagFilesRequest(
@@ -261,11 +321,12 @@ TEST_IMPORT_REQUEST_DRIVE_FOLDER_PARSING = ImportRagFilesRequest(
 TEST_DRIVE_FILE_ID = "456"
 TEST_DRIVE_FILE = f"https://drive.google.com/file/d/{TEST_DRIVE_FILE_ID}"
 TEST_IMPORT_FILES_CONFIG_DRIVE_FILE = ImportRagFilesConfig(
-    rag_file_chunking_config=RagFileChunkingConfig(
-        chunk_size=TEST_CHUNK_SIZE,
-        chunk_overlap=TEST_CHUNK_OVERLAP,
+    rag_file_transformation_config=TEST_RAG_FILE_TRANSFORMATION_CONFIG,
+    rag_file_parsing_config=RagFileParsingConfig(
+        advanced_parser=RagFileParsingConfig.AdvancedParser(
+            use_advanced_pdf_parsing=False
+        )
     ),
-    rag_file_parsing_config=RagFileParsingConfig(use_advanced_pdf_parsing=False),
 )
 TEST_IMPORT_FILES_CONFIG_DRIVE_FILE.max_embedding_requests_per_min = 800
 
@@ -319,11 +380,12 @@ TEST_SLACK_SOURCE = SlackChannelsSource(
         ),
     ],
 )
+TEST_RAG_FILE_PARSING_CONFIG = RagFileParsingConfig(
+    advanced_parser=RagFileParsingConfig.AdvancedParser(use_advanced_pdf_parsing=False)
+)
 TEST_IMPORT_FILES_CONFIG_SLACK_SOURCE = ImportRagFilesConfig(
-    rag_file_chunking_config=RagFileChunkingConfig(
-        chunk_size=TEST_CHUNK_SIZE,
-        chunk_overlap=TEST_CHUNK_OVERLAP,
-    )
+    rag_file_parsing_config=TEST_RAG_FILE_PARSING_CONFIG,
+    rag_file_transformation_config=TEST_RAG_FILE_TRANSFORMATION_CONFIG,
 )
 TEST_IMPORT_FILES_CONFIG_SLACK_SOURCE.slack_source.channels = [
     GapicSlackSource.SlackChannels(
@@ -375,10 +437,8 @@ TEST_JIRA_SOURCE = JiraSource(
     ],
 )
 TEST_IMPORT_FILES_CONFIG_JIRA_SOURCE = ImportRagFilesConfig(
-    rag_file_chunking_config=RagFileChunkingConfig(
-        chunk_size=TEST_CHUNK_SIZE,
-        chunk_overlap=TEST_CHUNK_OVERLAP,
-    )
+    rag_file_parsing_config=TEST_RAG_FILE_PARSING_CONFIG,
+    rag_file_transformation_config=TEST_RAG_FILE_TRANSFORMATION_CONFIG,
 )
 TEST_IMPORT_FILES_CONFIG_JIRA_SOURCE.jira_source.jira_queries = [
     GapicJiraSource.JiraQueries(
@@ -410,10 +470,8 @@ TEST_SHARE_POINT_SOURCE = SharePointSources(
     ],
 )
 TEST_IMPORT_FILES_CONFIG_SHARE_POINT_SOURCE = ImportRagFilesConfig(
-    rag_file_chunking_config=RagFileChunkingConfig(
-        chunk_size=TEST_CHUNK_SIZE,
-        chunk_overlap=TEST_CHUNK_OVERLAP,
-    ),
+    rag_file_parsing_config=TEST_RAG_FILE_PARSING_CONFIG,
+    rag_file_transformation_config=TEST_RAG_FILE_TRANSFORMATION_CONFIG,
     share_point_sources=GapicSharePointSources(
         share_point_sources=[
             GapicSharePointSources.SharePointSource(
@@ -488,10 +546,7 @@ TEST_SHARE_POINT_SOURCE_NO_FOLDERS = SharePointSources(
 )
 
 TEST_IMPORT_FILES_CONFIG_SHARE_POINT_SOURCE_NO_FOLDERS = ImportRagFilesConfig(
-    rag_file_chunking_config=RagFileChunkingConfig(
-        chunk_size=TEST_CHUNK_SIZE,
-        chunk_overlap=TEST_CHUNK_OVERLAP,
-    ),
+    rag_file_transformation_config=TEST_RAG_FILE_TRANSFORMATION_CONFIG,
     share_point_sources=GapicSharePointSources(
         share_point_sources=[
             GapicSharePointSources.SharePointSource(
@@ -540,4 +595,36 @@ TEST_RAG_RETRIEVAL_CONFIG_ALPHA = RagRetrievalConfig(
     top_k=2,
     filter=Filter(vector_distance_threshold=0.5),
     hybrid_search=HybridSearch(alpha=0.5),
+)
+TEST_RAG_RETRIEVAL_SIMILARITY_CONFIG = RagRetrievalConfig(
+    top_k=2,
+    filter=Filter(vector_distance_threshold=0.5),
+    hybrid_search=HybridSearch(alpha=0.5),
+)
+TEST_RAG_RETRIEVAL_ERROR_CONFIG = RagRetrievalConfig(
+    top_k=2,
+    filter=Filter(vector_distance_threshold=0.5, vector_similarity_threshold=0.5),
+)
+TEST_RAG_RETRIEVAL_RANKING_CONFIG = RagRetrievalConfig(
+    top_k=2,
+    filter=Filter(vector_distance_threshold=0.5),
+    ranking=Ranking(rank_service=RankService(model_name="test-rank-service")),
+)
+TEST_RAG_RETRIEVAL_ERROR_RANKING_CONFIG = RagRetrievalConfig(
+    top_k=2,
+    filter=Filter(vector_distance_threshold=0.5),
+    ranking=Ranking(
+        rank_service=RankService(model_name="test-rank-service"),
+        llm_ranker=LlmRanker(model_name="test-llm-ranker"),
+    ),
+)
+TEST_RAG_RETRIEVAL_CONFIG_RANK_SERVICE = RagRetrievalConfig(
+    top_k=2,
+    filter=Filter(vector_distance_threshold=0.5),
+    ranking=Ranking(rank_service=RankService(model_name="test-model-name")),
+)
+TEST_RAG_RETRIEVAL_CONFIG_LLM_RANKER = RagRetrievalConfig(
+    top_k=2,
+    filter=Filter(vector_distance_threshold=0.5),
+    ranking=Ranking(llm_ranker=LlmRanker(model_name="test-model-name")),
 )
